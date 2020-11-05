@@ -15,22 +15,25 @@ end
 function Fluxonium!( hamiltonian::Hermitian, ϕ::T, parameters::NamedTuple) where T<:Number
     @unpack El, Ec, Ej = parameters
     N,N = size(hamiltonian)
+
     ϕ₀ = (8Ec/El)^(1/4)
+    ħω = √(8El*Ec)
 
-    # populate upper triangle j ≥ i
-    for i ∈ 0:N-1, j ∈ i:N-1
-        Laguerre = exp(-ϕ₀^2/4) * laguerre(ϕ₀^2/2,min(i,j),abs(i-j))
+    laguerre_multiplier = Ej*exp(-ϕ₀^2/4)
+    for i ∈ 1:N, j ∈ i:N # populate upper triangle j ≥ i
+        laguerre_term = laguerre_multiplier * laguerre(ϕ₀^2/2,min(i,j)-1,abs(i-j))
 
-        if i ≠ j
-            normedLaguerre = ϕ₀^abs(i-j) * Laguerre / ( 2^((max(i,j)-min(i,j))/2) * prod( sqrt, min(i+1,j+1):max(i,j) ))
+        if i ≠ j # off diagonal terms
+            laguerre_term *= ϕ₀^abs(i-j) / ( 2^((max(i,j)-min(i,j))/2) * prod( sqrt, min(i,j):max(i,j)-1 ))
 
-            if (i+j) % 2 == 0
-                hamiltonian.data[i+1,j+1] = - Ej*cos(ϕ) * (-1)^( abs(i-j)/2   ) * normedLaguerre
-            else
-                hamiltonian.data[i+1,j+1] = - Ej*sin(ϕ) * (-1)^((abs(i-j)-1)/2) * normedLaguerre
+            if (i+j) % 2 == 0 # even terms
+                hamiltonian.data[i,j] = -(-1)^( abs(i-j)/2   ) * cos(ϕ)*laguerre_term
+            else # odd terms
+                hamiltonian.data[i,j] = -(-1)^((abs(i-j)-1)/2) * sin(ϕ)*laguerre_term
             end
-        else
-            hamiltonian.data[i+1,j+1] = √(8El*Ec)*(i+1/2) - Ej*cos(ϕ) * Laguerre
+
+        else # diagonal terms
+            hamiltonian.data[i,j] = ħω*(i-1/2) - cos(ϕ)*laguerre_term
         end
     end
 end
