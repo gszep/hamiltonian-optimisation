@@ -17,6 +17,7 @@ plot(fluxes,frequencies,spectrum,targets)
     zeros(3), 10ones(3), ones(3), Fminbox())
 
 plot!(fluxes,frequencies,(ϕ,θ)->Frequencies(𝓗,ϕ,θ;nlevels=nlevels),result)
+savefig("figures/6cb.pdf")
 
 #########################################################################
 #########################################################################
@@ -34,3 +35,4 @@ plot(fluxes,frequencies,spectrum,targets)
     zeros(3), 10ones(3), ones(3), Fminbox())
 
 plot!(fluxes,frequencies,(ϕ,θ)->Frequencies(𝓗,ϕ,θ;nlevels=nlevels),result)
+savefig("figures/7e3.pdf")

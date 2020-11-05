@@ -42,11 +42,11 @@ end
 
 import Plots: plot, plot!
 function plot(fluxes::Vector,frequencies::Vector,spectrum::Array,targets::NamedTuple)
-    plot( size=(500,500), xlabel=L"\mathrm{External\,\,\,Phase}\,\,\,\phi", ylabel=L"\mathrm{Frequency\,\,\,GHz}")
+    plot( grid=false, size=(500,500), xlabel=L"\mathrm{External\,\,\,Phase}\,\,\,\phi", ylabel=L"\mathrm{Frequency\,\,\,GHz}",legend=:none)
     heatmap!(fluxes,frequencies,spectrum)
 
     scatter!(targets.fluxes, targets.frequencies, label="", alpha=0.5,
-        color=:gold, markerstrokewidth=0, markersize=7 .*targets.weights) |> display
+        color=:white, markerstrokewidth=0, markersize=7 .*targets.weights) |> display
 end
 
 function plot!(fluxes::Vector,frequencies::Vector,model::Function,result)
@@ -62,7 +62,5 @@ function plot!(fluxes::Vector,frequencies::Vector,model::Function,result)
             label="", color=:gold, linewidth=3 )
     end
 
-    padding = 0.15*maximum(frequencies)
-    plot!([NaN],[NaN], ylim=(minimum(frequencies)-padding,maximum(frequencies)+padding),
-        label="$parameters", color=:gold, lw=3) |> display
+    plot!(title=LaTeXString("\$E_L=$(parameters.El)\\quad E_C=$(parameters.Ec)\\quad E_J=$(parameters.Ej)\$")) |> display
 end
