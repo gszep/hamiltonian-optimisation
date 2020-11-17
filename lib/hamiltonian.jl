@@ -1,6 +1,14 @@
 using LinearAlgebra
 using Parameters: @unpack
-include("utils.jl")
+
+using PhysicalConstants: CODATA2018
+const ħ = Float64(CODATA2018.ħ).val
+
+
+⊗(A,B) = kron(A,B) # define tensor product as kroneker product
+function annihilation(n::Integer)
+    return Bidiagonal(zeros(n), map(sqrt,1:n-1), :U)
+end
 
 function laguerre(x::T, n::Integer, α::Integer) where T<:Number
     n == 0 ? (return one(T)) : nothing
@@ -12,12 +20,13 @@ function laguerre(x::T, n::Integer, α::Integer) where T<:Number
     return Lₖ
 end
 
+
 function Fluxonium!( hamiltonian::Hermitian, ϕ::T, parameters::NamedTuple) where T<:Number
     @unpack El, Ec, Ej = parameters
     N,N = size(hamiltonian)
 
     ϕ₀ = (8Ec/El)^(1/4)
-    ħω = √(8El*Ec)
+    ω = √(8El*Ec)
 
     laguerre_multiplier = Ej*exp(-ϕ₀^2/4)
     for i ∈ 1:N, j ∈ i:N # populate upper triangle j ≥ i
@@ -33,18 +42,52 @@ function Fluxonium!( hamiltonian::Hermitian, ϕ::T, parameters::NamedTuple) wher
             end
 
         else # diagonal terms
-            hamiltonian.data[i,j] = ħω*(i-1/2) - cos(ϕ)*laguerre_term
+            hamiltonian.data[i,j] = ω*(i-1/2) - cos(ϕ)*laguerre_term
         end
     end
 end
 
-function Frequencies( hamiltonian::Hermitian, ϕ::T, parameters::NamedTuple; nlevels=3 ) where T<:Number
-    Fluxonium!( hamiltonian, ϕ, parameters )
-    return cumsum(diff(eigvals!(hamiltonian,1:nlevels+1)))
+
+function Resonator!( hamiltonian::Hermitian, parameters::NamedTuple)
+    @unpack νr = parameters
+    N,N = size(hamiltonian)
+    println(typeof(ħ))
+
+    for i ∈ 1:N, j ∈ i:N # populate upper triangle j ≥ i
+        if i ≠ j # off diagonal terms
+            hamiltonian.data[i,j] = 0.0
+
+        else # diagonal terms
+            hamiltonian.data[i,j] = νr*(i-1/2)
+        end
+    end
 end
 
-function loss( hamiltonian::Hermitian, parameters::NamedTuple, data::NamedTuple; nlevels=3) where T<:Number
-    frequencies = hcat( Frequencies.( Ref(hamiltonian), data.fluxes, Ref(parameters); nlevels=nlevels)... )
-    least_squares = ( data.frequencies .- frequencies' ).^2
-    log(first(data.weights'minimum(least_squares,dims=2))) - log(sum(data.weights))
+
+function Coupling!( system::Hermitian, fluxonium::Hermitian, resonator::Hermitian, ϕ::T, parameters::NamedTuple) where T<:Number
+    @unpack Gϕ,Gq, El,Ec = parameters
+    ϕ₀ = (8Ec/El)^(1/4)
+    
+    ############################################################################
+    ################################################################## fluxonium
+
+    # wavefunctions and energies of the qbit
+    Fluxonium!(fluxonium,ϕ,parameters)
+    N,N = size(fluxonium)
+    a = annihilation(N)
+
+    # calculate operators in qbit basis
+    energies,Ψ = eigen(fluxonium)
+    flux = ϕ₀ * Ψ * (a+a')/√2 * Ψ'
+    charge = im*(energies .- energies') .* flux / (8*Ec)
+
+    ############################################################################
+    ################################################################## resonator
+    Resonator!(resonator,parameters)
+    n,n = size(resonator)
+    A = annihilation(n)
+    
+    ############################################################################
+    coupling = Gϕ * flux ⊗ ( A + A' ) + im * Gq * charge ⊗ ( A - A' )
+    system.data .= fluxonium ⊗ I(n)  +  I(N) ⊗ resonator  +  coupling
 end
