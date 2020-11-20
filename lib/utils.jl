@@ -1,7 +1,7 @@
 using CSV,DataFrames,Plots,LaTeXStrings
 using Images: imfilter,Kernel
 
-function File(path; frequency_cutoff=8.0, flux_cutoff=Inf )
+function File(path; frequency_cutoff=12.0, flux_cutoff=Inf )
 
     spectrum = CSV.File(path*"spectrum.csv",header=false) |> DataFrame
     frequencies = CSV.File(path*"frequencies.csv",header=false) |> DataFrame
