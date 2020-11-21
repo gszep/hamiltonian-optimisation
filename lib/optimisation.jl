@@ -1,7 +1,10 @@
 using Optim,LinearAlgebra
 
-function Frequencies( hamiltonian::Hermitian; nlevels=3, νr=nothing, Δν=1.0)
+function Frequencies( hamiltonian::Hermitian, ϕ::T, parameters::NamedTuple;
+        nlevels=3, νr=nothing, Δν=1.0) where T<:Number
+
     if isnothing(νr)
+        Fluxonium!(hamiltonian,ϕ,parameters)
         return cumsum(diff(eigvals(hamiltonian,1:nlevels+1)))
     else
         return eigvals(hamiltonian)
