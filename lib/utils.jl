@@ -9,7 +9,13 @@ function File(path; frequency_cutoff=12.0, flux_cutoff=Inf )
 
     spectrum = convert(Matrix,spectrum)
     frequencies = convert(Array,frequencies)[:,1]
-    fluxes = convert(Array,fluxes)[:,1] #2π.*
+    fluxes = convert(Array,fluxes)[:,1]
+
+    n,m = size(spectrum)
+    N,M = length(frequencies),length(fluxes)
+
+    @assert(m==M,"flux array length $M ≠ spectrum matrix width $M")
+    @assert(n==N,"frequency array length $N ≠ spectrum matrix height $n")
 
     frequency_mask = frequencies .< frequency_cutoff
     flux_mask = fluxes .< flux_cutoff
