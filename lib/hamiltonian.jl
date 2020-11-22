@@ -51,7 +51,6 @@ end
 function Resonator!( hamiltonian::Hermitian, parameters::NamedTuple)
     @unpack νr = parameters
     N,N = size(hamiltonian)
-    println(typeof(ħ))
 
     for i ∈ 1:N, j ∈ i:N # populate upper triangle j ≥ i
         if i ≠ j # off diagonal terms
@@ -65,7 +64,7 @@ end
 
 
 function Coupling!( system::Hermitian, fluxonium::Hermitian, resonator::Hermitian, ϕ::T, parameters::NamedTuple) where T<:Number
-    @unpack Gϕ,Gq, El,Ec = parameters
+    @unpack Gl,Gc, El,Ec = parameters
     ϕ₀ = (8Ec/El)^(1/4)
     
     ############################################################################
@@ -88,6 +87,6 @@ function Coupling!( system::Hermitian, fluxonium::Hermitian, resonator::Hermitia
     A = annihilation(n)
     
     ############################################################################
-    coupling = Gϕ * flux ⊗ ( A + A' ) + im * Gq * charge ⊗ ( A - A' )
+    coupling = Gl * flux ⊗ ( A + A' ) + im * Gc * charge ⊗ ( A - A' )
     system.data .= fluxonium ⊗ I(n)  +  I(N) ⊗ resonator  +  coupling
 end

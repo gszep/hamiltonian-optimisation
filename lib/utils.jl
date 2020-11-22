@@ -31,7 +31,7 @@ function File(path; weight = ϕ->exp(-abs(sin(ϕ))), kwargs...)
     n,m = size(spectrum)
     N,M = length(frequencies),length(fluxes)
 
-    @assert(m==M,"flux array length $M ≠ spectrum matrix width $M")
+    @assert(m==M,"flux array length $M ≠ spectrum matrix width $m")
     @assert(n==N,"frequency array length $N ≠ spectrum matrix height $n")
 
     # apply cutoffs
@@ -70,18 +70,15 @@ function plot(fluxes::Vector,frequencies::Vector,spectrum::Array,targets::NamedT
         color=:white, markerstrokewidth=0, markersize=7 .*targets.weights) |> display
 end
 
-function plot!(fluxes::Vector,frequencies::Vector,model::Function,result)
-
-    parameters = round.(result.minimizer, digits=2)
-    parameters = (El=parameters[1], Ec=parameters[2], Ej=parameters[3])
+function plot!(fluxes::Vector,frequencies::Vector,model::Function,parameters::NamedTuple; color=:gold)
 
     model_fluxes = minimum(fluxes):0.01:maximum(fluxes)
-    model_frequencies = map(ϕ->model(ϕ,parameters),model_fluxes)
+    model_frequencies = map(model,model_fluxes)
 
-    for idx ∈ 1:nlevels
+    for idx ∈ 1:length(first(model_frequencies))
         plot!( model_fluxes, map( ϕ->ϕ[idx], model_frequencies),
-            label="", color=:gold, linewidth=3 )
+            label="", color=color, linewidth=3 )
     end
 
-    plot!(title=LaTeXString("\$E_L=$(parameters.El)\\quad E_C=$(parameters.Ec)\\quad E_J=$(parameters.Ej)\$")) |> display
+    plot!(titlefontsize=12,title=LaTeXString("\$E_L=$(round(parameters.El,digits=2))\\quad E_C=$(round(parameters.Ec,digits=2))\\quad E_J=$(round(parameters.Ej,digits=2))\\quad G_L=$(round(parameters.Gl,digits=2))\\quad G_C=$(round(parameters.Gc,digits=2))\$")) |> display
 end
