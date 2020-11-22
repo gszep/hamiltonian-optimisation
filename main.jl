@@ -20,14 +20,20 @@ begin # load data with preprocessing parameters
 	plot(fluxes,frequencies,spectrum,targets)
 end
 
-begin
-    H = Hermitian(zeros(20,20))
-    nlevels = 1
+begin # fit model parameters
 
+    H = Hermitian(zeros(20,20))
+	nlevels = 1
+	
+	lower_bound, upper_bound = zeros(3), 10ones(3)
+	inital_guess = ones(3)
+	
 	result = optimize(
 		x->loss(H, (El=x[1],Ec=x[2],Ej=x[3]), targets; nlevels=nlevels),
-		zeros(3), 10ones(3), ones(3), Fminbox())
+		lower_bound, upper_bound, inital_guess, Fminbox())
+
+	plot!( fluxes, frequencies, (ϕ,parameters)->Frequencies(H,ϕ,parameters;nlevels=nlevels), result)
 end
 
-plot!(fluxes,frequencies, (flux,parameters)->Frequencies(H,flux,parameters;nlevels=nlevels), result)
+# save final figure when happy
 savefig(joinpath("figures",replace(name,"/"=>"-")*".pdf"))
