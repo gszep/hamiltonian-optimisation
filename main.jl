@@ -1,38 +1,33 @@
-using Optim
-include("lib/hamiltonian.jl")
+begin # load required libraries
+	using Optim,LinearAlgebra
+	using Parameters: @unpack
+	using LaTeXStrings,Plots
 
-#########################################################################
-#########################################################################
-#########################################################################
-fluxes,frequencies,spectrum = File("./data/6cb/")
-targets = preprocess(fluxes,frequencies,spectrum,
-    threshold=0.025,blur=3,downSample=10)
+	include("lib/hamiltonian.jl")
+	include("lib/optimisation.jl")
+	include("lib/utils.jl")
+end
 
-plot(fluxes,frequencies,spectrum,targets)
+begin # load data with preprocessing parameters
+	name = "C/L4"
+	data_path = joinpath("data",name)
 
-#########################################################################
-𝓗, nlevels = Hermitian(zeros(20,20)), 1
-@time result = optimize(
-    θ->loss(𝓗,(El=θ[1],Ec=θ[2],Ej=θ[3]),targets;nlevels=nlevels),
-    zeros(3), 10ones(3), ones(3), Fminbox())
+	fluxes,frequencies,spectrum,targets = File(data_path;
 
-plot!(fluxes,frequencies,(ϕ,θ)->Frequencies(𝓗,ϕ,θ;nlevels=nlevels),result)
-savefig("figures/6cb.pdf")
+		# threshold=0.01, blur=1, downSample=10,
+		# frequency_cutoff=9.5, flux_cutoff=Inf, maxTargets=1e3
+	)
+	plot(fluxes,frequencies,spectrum,targets)
+end
 
-#########################################################################
-#########################################################################
-#########################################################################
-fluxes,frequencies,spectrum = File("./data/7e3/",frequency_cutoff=6.4)
-targets = preprocess(fluxes,frequencies,spectrum,
-    threshold=0.008,blur=1,downSample=2)
+begin
+    H = Hermitian(zeros(20,20))
+    nlevels = 1
 
-plot(fluxes,frequencies,spectrum,targets)
+	result = optimize(
+		x->loss(H, (El=x[1],Ec=x[2],Ej=x[3]), targets; nlevels=nlevels),
+		zeros(3), 10ones(3), ones(3), Fminbox())
+end
 
-#########################################################################
-𝓗, nlevels = Hermitian(zeros(20,20)), 2
-@time result = optimize(
-    θ->loss(𝓗,(El=θ[1],Ec=θ[2],Ej=θ[3]),targets;nlevels=nlevels),
-    zeros(3), 10ones(3), ones(3), Fminbox())
-
-plot!(fluxes,frequencies,(ϕ,θ)->Frequencies(𝓗,ϕ,θ;nlevels=nlevels),result)
-savefig("figures/7e3.pdf")
+plot!(fluxes,frequencies, (flux,parameters)->Frequencies(H,flux,parameters;nlevels=nlevels), result)
+savefig(joinpath("figures",replace(name,"/"=>"-")*".pdf"))
