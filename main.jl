@@ -21,7 +21,7 @@ begin # load data with preprocessing parameters
 	fluxes,frequencies,spectrum,targets = File(data_path;
 
 		# preprocessing parameters can be updated here
-		threshold=0.1, blur=0.5, downSample=100,
+		threshold=0.1, blur=1, downSample=1,
 		#frequency_cutoff=Inf, flux_cutoff=Inf, maxTargets=1e3
 	)
 	plot(fluxes,frequencies,spectrum,targets)
@@ -31,7 +31,7 @@ begin # fit model parameters
 
 	fluxonium = Hermitian(zeros(20,20))
 	parameters = ( El=1.0,Ec=1.0,Ej=1.0, Gl=0.0,Gc=0.0 )
-	nlevels = 1:3
+	nlevels = 1:5
 	
 	lower_bound, upper_bound = [0.0,0.0,0.0], [50.0,50.0,50.0]
 	inital_guess = [1.0,1.0,1.0]
