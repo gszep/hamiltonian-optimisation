@@ -1,16 +1,40 @@
 using CSV,DataFrames,Plots,LaTeXStrings
 using Images: imfilter,Kernel
 
-function File(path; frequency_cutoff=12.0, flux_cutoff=Inf )
+using Serialization: serialize,deserialize
+using Parameters: @unpack
 
-    spectrum = CSV.File(path*"spectrum.csv",header=false) |> DataFrame
-    frequencies = CSV.File(path*"frequencies.csv",header=false) |> DataFrame
-    fluxes = CSV.File(path*"fluxes.csv",header=false) |> DataFrame
+function File(path; weight = ϕ->exp(-abs(sin(ϕ))), kwargs...)
+    parameters = Dict(
 
+        :threshold => 1, :blur => 1, :downSample => 1,
+        :maxTargets => 1e3, :frequency_cutoff => Inf, :flux_cutoff => Inf
+    )
+    
+    if isfile(joinpath(path,"parameters.jls")) merge!(parameters,open(deserialize,joinpath(path,"parameters.jls"),"r")) end
+    merge!(parameters,kwargs)
+
+    @unpack threshold,blur,downSample,maxTargets,frequency_cutoff,flux_cutoff = parameters
+    printstyled(color=:blue,bold=true,"threshold\t$threshold\nblur\t\t$blur\ndownSample\t$downSample\n\nfrequency_cutoff\t$frequency_cutoff\nflux_cutoff\t\t$flux_cutoff\nmaxTargets\t\t$maxTargets\n")
+
+    # import csv files as dataframes
+    spectrum = isfile(joinpath(path,"spectrum.csv")) ? CSV.File(joinpath(path,"spectrum.csv"),header=false) |> DataFrame : throw("no such file $(joinpath(path,"spectrum.csv"))")
+    frequencies = isfile(joinpath(path,"frequencies.csv")) ? CSV.File(joinpath(path,"frequencies.csv"),header=false) |> DataFrame : throw("no such file $(joinpath(path,"frequencies.csv"))")
+    fluxes = isfile(joinpath(path,"fluxes.csv")) ? CSV.File(joinpath(path,"fluxes.csv"),header=false) |> DataFrame : throw("no such file $(joinpath(path,"fluxes.csv"))")
+
+    # convert dataframes to mutlidimensional arrays
     spectrum = convert(Matrix,spectrum)
     frequencies = convert(Array,frequencies)[:,1]
-    fluxes = convert(Array,fluxes)[:,1] #2π.*
+    fluxes = convert(Array,fluxes)[:,1]
 
+    ########################################### check dimensions match
+    n,m = size(spectrum)
+    N,M = length(frequencies),length(fluxes)
+
+    @assert(m==M,"flux array length $M ≠ spectrum matrix width $m")
+    @assert(n==N,"frequency array length $N ≠ spectrum matrix height $n")
+
+    # apply cutoffs
     frequency_mask = frequencies .< frequency_cutoff
     flux_mask = fluxes .< flux_cutoff
 
@@ -18,26 +42,23 @@ function File(path; frequency_cutoff=12.0, flux_cutoff=Inf )
     frequencies = frequencies[frequency_mask]
     fluxes = fluxes[flux_mask]
 
-    return fluxes,frequencies,spectrum
-end
-
-function preprocess(fluxes,frequencies,spectrum; threshold=1, blur=1, downSample=1,
-         weight=ϕ->exp.(-abs.(sin.(ϕ))) )
-
+    ############################################### extract targets with edge detection
     laplacian = imfilter(imfilter(spectrum, Kernel.gaussian(blur)), Kernel.Laplacian())
     mask = laplacian.<-abs(threshold)
 
-    data = (fluxes=Float64[],frequencies=Float64[], weights=Float64[])
+    targets = (fluxes=Float64[],frequencies=Float64[], weights=Float64[])
     for index ∈  findall(mask)[1:downSample:end]
 
-        push!(data.fluxes, fluxes[index[2]])
-        push!(data.frequencies, frequencies[index[1]])
-        push!(data.weights, weight(fluxes[index[2]]))
+        push!(targets.fluxes, fluxes[index[2]])
+        push!(targets.frequencies, frequencies[index[1]])
+        push!(targets.weights, weight.(fluxes[index[2]]))
     end
 
-    @assert(length(data.fluxes)≠0,"no data returned; decrease downSample or threshold")
-    @assert(length(data.fluxes)<1e3,"too much data; increase downSample or threshold")
-    return data
+    @assert(length(targets.fluxes)>0,"no data returned; decrease downSample or threshold")
+    @assert(length(targets.fluxes)<maxTargets,"too much data; increase downSample or threshold")
+
+    open(f -> serialize(f,parameters), joinpath(path,"parameters.jls"),"w")
+    return fluxes,frequencies,spectrum,targets
 end
 
 import Plots: plot, plot!
@@ -49,18 +70,15 @@ function plot(fluxes::Vector,frequencies::Vector,spectrum::Array,targets::NamedT
         color=:white, markerstrokewidth=0, markersize=7 .*targets.weights) |> display
 end
 
-function plot!(fluxes::Vector,frequencies::Vector,model::Function,result)
-
-    parameters = round.(result.minimizer, digits=2)
-    parameters = (El=parameters[1], Ec=parameters[2], Ej=parameters[3])
+function plot!(fluxes::Vector,frequencies::Vector,model::Function,parameters::NamedTuple; color=:gold)
 
     model_fluxes = minimum(fluxes):0.01:maximum(fluxes)
-    model_frequencies = map(ϕ->model(ϕ,parameters),model_fluxes)
+    model_frequencies = map(model,model_fluxes)
 
-    for idx ∈ 1:nlevels
+    for idx ∈ 1:length(first(model_frequencies))
         plot!( model_fluxes, map( ϕ->ϕ[idx], model_frequencies),
-            label="", color=:gold, linewidth=3 )
+            label="", color=color, linewidth=3 )
     end
 
-    plot!(title=LaTeXString("\$E_L=$(parameters.El)\\quad E_C=$(parameters.Ec)\\quad E_J=$(parameters.Ej)\$")) |> display
+    plot!(titlefontsize=12,title=LaTeXString("\$E_L=$(round(parameters.El,digits=2))\\quad E_C=$(round(parameters.Ec,digits=2))\\quad E_J=$(round(parameters.Ej,digits=2))\\quad G_L=$(round(parameters.Gl,digits=2))\\quad G_C=$(round(parameters.Gc,digits=2))\$")) |> display
 end
