@@ -6,8 +6,13 @@ using InteractiveUtils
 
 # ╔═╡ 5c921290-24cb-11eb-3427-51bbe32cc4a2
 begin
-	using Optim,LaTeXStrings,Plots,LinearAlgebra
-	include("lib/hamiltonian.jl");
+	using Optim,LinearAlgebra
+	using Parameters: @unpack
+	using LaTeXStrings,Plots
+
+	include("lib/hamiltonian.jl")
+	include("lib/optimisation.jl")
+	include("lib/utils.jl")
 end
 
 # ╔═╡ 0a7a3640-28c2-11eb-04a9-f17464e7b232
