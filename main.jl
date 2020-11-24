@@ -5,6 +5,8 @@ begin # load required libraries
 
 	include("lib/hamiltonian.jl")
 	include("lib/optimisation.jl")
+
+	include("lib/contours.jl")
 	include("lib/utils.jl")
 end
 
@@ -13,14 +15,14 @@ end
 ################################################################ uncoupled
 
 begin # load data with preprocessing parameters
-	name = "B/L3"
+	name = "B/L4"
 	data_path = joinpath("data",name)
 
 	fluxes,frequencies,spectrum,targets = File(data_path;
 
 		# preprocessing parameters can be updated here
-		# threshold=0.01, blur=1, downSample=10,
-		# frequency_cutoff=9.5, flux_cutoff=Inf, maxTargets=1e3
+		threshold=0.1, blur=1, downSample=1,
+		#frequency_cutoff=Inf, flux_cutoff=Inf, maxTargets=1e3
 	)
 	plot(fluxes,frequencies,spectrum,targets)
 end
@@ -29,16 +31,17 @@ begin # fit model parameters
 
 	fluxonium = Hermitian(zeros(20,20))
 	parameters = ( El=1.0,Ec=1.0,Ej=1.0, Gl=0.0,Gc=0.0 )
-	nlevels = 1
+	nlevels = 1:5
 	
-	lower_bound, upper_bound = [0.0,0.0,0.0], [10.0,10.0,10.0]
+	lower_bound, upper_bound = [0.0,0.0,0.0], [50.0,50.0,50.0]
 	inital_guess = [1.0,1.0,1.0]
 	
-	result = optimize(
-		x->loss(fluxonium, merge(parameters,(El=x[1],Ec=x[2],Ej=x[3])), targets; nlevels=nlevels),
-		lower_bound, upper_bound, inital_guess, Fminbox())
+	# result = optimize(
+	# 	x->loss(fluxonium, merge(parameters,(El=x[1],Ec=x[2],Ej=x[3])), targets; nlevels=nlevels),
+	# 	lower_bound, upper_bound, inital_guess, Fminbox())
 	
-	parameters = merge(parameters, (El=result.minimizer[1],Ec=result.minimizer[2],Ej=result.minimizer[3]) )
+	# parameters = merge(parameters, (El=result.minimizer[1],Ec=result.minimizer[2],Ej=result.minimizer[3]) )
+	parameters = merge(parameters, (El=1.7,Ec=0.4,Ej=10.3) )
 	plot!( fluxes, frequencies, ϕ->Frequencies(fluxonium,ϕ,parameters;nlevels=nlevels), parameters)
 end
 
