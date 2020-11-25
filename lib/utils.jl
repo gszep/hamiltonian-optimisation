@@ -1,55 +1,78 @@
 using CSV,DataFrames,Plots,LaTeXStrings
-using Images: imfilter,Kernel
+using Images: Gray,imfilter,Kernel,imresize,dilate,erode
 
 using Serialization: serialize,deserialize
 using Parameters: @unpack
 
+function Load(source; kwargs...)
+    if isfile(source)
+
+        data = CSV.File(source; header=false, kwargs...) |> DataFrame
+        return convert(Array,data)
+
+    else 
+        throw("no such file $source")
+    end
+end
+
+import Base: merge
+function merge(x::NamedTuple,y::AbstractVector)
+    update = Dict( key=>y[i] for (i,key) ∈ enumerate(keys(x)[1:length(y)]) )
+    return merge(x,update)
+end
+
 function File(path; weight = ϕ->exp(-abs(sin(ϕ))), image_size=512, kwargs...)
     parameters = Dict(
 
-        :threshold => 1, :blur => 1, :downSample => 1,
-        :maxTargets => 1e3, :frequency_cutoff => Inf, :flux_cutoff => Inf
+        :threshold => 0.2,
+        :kernel => [-1 0 1; -2 0 2; -1 0 1],
+        :dilations => 3, :erosions => 1,
+
+        :dilationDirection => 1,
+        :erosionDirection => 2,
+
+        :maxTargets => 1e3, :downSample => 1,
+        :frequencyLimits => (-Inf,Inf), :fluxLimits => (-Inf,Inf),
     )
     
-    if isfile(joinpath(path,"parameters.jls")) merge!(parameters,open(deserialize,joinpath(path,"parameters.jls"),"r")) end
+    if isfile(joinpath(path,"parameters.jls"))
+        merge!(parameters,open(deserialize,joinpath(path,"parameters.jls"),"r"))
+    end
     merge!(parameters,kwargs)
 
-    @unpack threshold,blur,downSample,maxTargets,frequency_cutoff,flux_cutoff = parameters
-    printstyled(color=:blue,bold=true,"threshold\t$threshold\nblur\t\t$blur\ndownSample\t$downSample\n\nfrequency_cutoff\t$frequency_cutoff\nflux_cutoff\t\t$flux_cutoff\nmaxTargets\t\t$maxTargets\n")
+    @unpack threshold,dilations,erosions,kernel,dilationDirection,erosionDirection,downSample,maxTargets,frequencyLimits,fluxLimits = parameters
+    printstyled(color=:blue,bold=true,"""threshold\t$threshold\ndilations\t$dilations\nerosions\t$erosions\nkernel\t\t$kernel\n\ndilationDirection\t$dilationDirection\nerosionDirection\t$erosionDirection\n\nfrequencyLimits\t$frequencyLimits\nfluxLimits\t$fluxLimits\nmaxTargets\t$maxTargets\n""")
 
-    # import csv files as dataframes
-    spectrum = isfile(joinpath(path,"spectrum.csv")) ? CSV.File(joinpath(path,"spectrum.csv"),header=false) |> DataFrame : throw("no such file $(joinpath(path,"spectrum.csv"))")
-    frequencies = isfile(joinpath(path,"frequencies.csv")) ? CSV.File(joinpath(path,"frequencies.csv"),header=false) |> DataFrame : throw("no such file $(joinpath(path,"frequencies.csv"))")
-    fluxes = isfile(joinpath(path,"fluxes.csv")) ? CSV.File(joinpath(path,"fluxes.csv"),header=false) |> DataFrame : throw("no such file $(joinpath(path,"fluxes.csv"))")
+    # import csv files as arrays
+    spectrum = Load(joinpath(path,"spectrum.csv"))
+    frequencies = Load(joinpath(path,"frequencies.csv"))
+    fluxes = Load(joinpath(path,"fluxes.csv"))
 
-    # convert dataframes to mutlidimensional arrays
-    spectrum = convert(Matrix,spectrum)
-    frequencies = convert(Array,frequencies)[:,1]
-    fluxes = convert(Array,fluxes)[:,1]
-
-    # resize spectrum to same aspect ratio
-    spectrum = imresize(Gray.(spectrum),image_size,image_size)
+    # resize
+    spectrum = imresize(spectrum,image_size,image_size)
     frequencies = range(minimum(frequencies),maximum(frequencies),length=image_size) |> collect
     fluxes = range(minimum(fluxes),maximum(fluxes),length=image_size) |> collect
 
     # apply cutoffs
-    frequency_mask = frequencies .< frequency_cutoff
-    flux_mask = fluxes .< flux_cutoff
+    frequency_mask = @. (frequencyLimits[1]<frequencies) & (frequencies<frequencyLimits[2])
+    flux_mask = @. (fluxLimits[1]<fluxes) & (fluxes<fluxLimits[2])
 
     spectrum = spectrum[frequency_mask,flux_mask]
     frequencies = frequencies[frequency_mask]
     fluxes = fluxes[flux_mask]
 
     ############################################### extract targets with edge detection
-    laplacian = imfilter(imfilter(spectrum, Kernel.gaussian(blur)), Kernel.Laplacian())
-    mask = laplacian.<-abs(threshold)
+    edges = threshold .< imfilter(spectrum,kernel)
+    mask = repeated_dilate(edges,dilations;region=dilationDirection)
+    mask = repeated_erode(mask,erosions;region=erosionDirection)
 
     targets = (fluxes=Float64[],frequencies=Float64[], weights=Float64[])
-    for index ∈  findall(mask)[1:downSample:end]
+    for index ∈ findall(mask)[1:downSample:end]
+        frequencyIndex,fluxIndex = index[1],index[2]
 
-        push!(targets.fluxes, fluxes[index[2]])
-        push!(targets.frequencies, frequencies[index[1]])
-        push!(targets.weights, weight.(fluxes[index[2]]))
+        push!(targets.fluxes, fluxes[fluxIndex])
+        push!(targets.frequencies, frequencies[frequencyIndex])
+        push!(targets.weights, weight(fluxes[fluxIndex]) )
     end
 
     @assert(length(targets.fluxes)>0,"no data returned; decrease downSample or threshold")
@@ -59,49 +82,8 @@ function File(path; weight = ϕ->exp(-abs(sin(ϕ))), image_size=512, kwargs...)
     return fluxes,frequencies,spectrum,targets
 end
 
-"""
-    edges = sujoy(img; four_connectivity=true)
-
-Compute edges of an image using the Sujoy algorithm.
-
-# Parameters
-
-* `img` (Required): any gray image
-* `four_connectivity=true`: if true, kernel is based on 4-neighborhood, else, kernel is based on
-   8-neighborhood,
-
-# Returns
-
-* `edges` : gray image
-"""
-function sujoy(img; four_connectivity=true)
-    img_channel = Gray.(img)
-
-    min_val = minimum(img_channel)
-    img_channel = img_channel .- min_val
-    max_val = maximum(img_channel)
-
-    if max_val == 0
-        return img
-    end
-
-    img_channel = img_channel./max_val
-
-    if four_connectivity
-        krnl_h = centered(Gray{Float32}[0 -1 -1 -1 0; 0 -1 -1 -1 0; 0 0 0 0 0; 0 1 1 1 0; 0 1 1 1 0]./12)
-        krnl_v = centered(Gray{Float32}[0 0 0 0 0; -1 -1 0 1 1;-1 -1 0 1 1;-1 -1 0 1 1;0 0 0 0 0 ]./12)
-    else
-        krnl_h = centered(Gray{Float32}[0 0 -1 0 0; 0 -1 -1 -1 0; 0 0 0 0 0; 0 1 1 1 0; 0 0 1 0 0]./8)
-        krnl_v = centered(Gray{Float32}[0 0 0 0 0;  0 -1 0 1 0; -1 -1 0 1 1;0 -1 0 1 0; 0 0 0 0 0 ]./8)
-    end
-
-    grad_h = imfilter(img_channel, krnl_h')
-    grad_v = imfilter(img_channel, krnl_v')
-
-    grad = (grad_h.^2) .+ (grad_v.^2)
-
-    return grad
-end
+repeated_dilate(img::AbstractArray, n::Integer; region=[1,2]) = reduce(∘, ntuple(_-> x->dilate(x,region), n))(img)
+repeated_erode(img::AbstractArray, n::Integer; region=[1,2]) = reduce(∘, ntuple(_-> x->erode(x,region), n))(img)
 
 import Plots: plot, plot!
 function plot(fluxes::Vector,frequencies::Vector,spectrum::Array,targets::NamedTuple)
@@ -122,5 +104,5 @@ function plot!(fluxes::Vector,frequencies::Vector,model::Function,parameters::Na
             label="", color=color, linewidth=3 )
     end
 
-    plot!(titlefontsize=12,title=LaTeXString("\$E_L=$(round(parameters.El,digits=2))\\quad E_C=$(round(parameters.Ec,digits=2))\\quad E_J=$(round(parameters.Ej,digits=2))\\quad G_L=$(round(parameters.Gl,digits=2))\\quad G_C=$(round(parameters.Gc,digits=2))\$")) |> display
+    plot!(titlefontsize=9,title=LaTeXString("\$E_L=$(round(parameters.El,digits=2))\\quad E_C=$(round(parameters.Ec,digits=2))\\quad E_J=$(round(parameters.Ej,digits=2))\\quad G_L=$(round(parameters.Gl,digits=2))\\quad G_C=$(round(parameters.Gc,digits=2))\\quad \\nu_R=$(round(parameters.νr,digits=2))\$")) |> display
 end

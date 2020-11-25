@@ -48,45 +48,17 @@ function Fluxonium!( hamiltonian::Hermitian, ϕ::T, parameters::NamedTuple) wher
 end
 
 
-function Resonator!( hamiltonian::Hermitian, parameters::NamedTuple)
-    @unpack νr = parameters
-    N,N = size(hamiltonian)
-
-    for i ∈ 1:N, j ∈ i:N # populate upper triangle j ≥ i
-        if i ≠ j # off diagonal terms
-            hamiltonian.data[i,j] = 0.0
-
-        else # diagonal terms
-            hamiltonian.data[i,j] = νr*(i-1/2)
-        end
-    end
+function Resonator( N::Integer )
+    return Diagonal(collect(1:N).-1/2)
 end
 
 
-function Coupling!( system::Hermitian, fluxonium::Hermitian, resonator::Hermitian, ϕ::T, parameters::NamedTuple) where T<:Number
-    @unpack Gl,Gc, El,Ec = parameters
+function Coupling!( system::Hermitian, ϕ::T, parameters::NamedTuple) where T<:Number
+    @unpack Gl,Gc,νr, El,Ec = parameters
     ϕ₀ = (8Ec/El)^(1/4)
-    
-    ############################################################################
-    ################################################################## fluxonium
 
-    # wavefunctions and energies of the qbit
     Fluxonium!(fluxonium,ϕ,parameters)
-    N,N = size(fluxonium)
-    a = annihilation(N)
-
-    # calculate operators in qbit basis
-    energies,Ψ = eigen(fluxonium)
-    flux = ϕ₀ * Ψ * (a+a')/√2 * Ψ'
-    charge = im*(energies .- energies') .* flux / (8*Ec)
-
-    ############################################################################
-    ################################################################## resonator
-    Resonator!(resonator,parameters)
-    n,n = size(resonator)
-    A = annihilation(n)
+    system.data .= fluxonium ⊗ I(n)  +  νr*resonator  +  Gl*ϕ₀ * inductive_term - Gc/ϕ₀ * capacitive_term
     
-    ############################################################################
-    coupling = Gl * flux ⊗ ( A + A' ) + im * Gc * charge ⊗ ( A - A' )
-    system.data .= fluxonium ⊗ I(n)  +  I(N) ⊗ resonator  +  coupling
+    return nothing
 end
