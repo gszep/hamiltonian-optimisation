@@ -1,5 +1,5 @@
 begin # load required libraries
-	using Optim,LinearAlgebra
+	using Optim,LinearAlgebra,StatsBase
 	using Parameters: @unpack
 	using LaTeXStrings,Plots
 
@@ -19,7 +19,8 @@ begin # load data with preprocessing parameters
 	fluxes,frequencies,spectrum,targets = File(data_path;
 
 		# preprocessing parameters can be updated here
-		# threshold = 0.2
+		# threshold = 0.047, downSample=10, dilations=3, erosions=1,
+		# frequencyLimits=(-Inf,9.5)
 	)
 	plot(fluxes,frequencies,spectrum,targets)
 end
@@ -60,17 +61,13 @@ savefig(joinpath("figures",name*".pdf"))
 begin # load data with preprocessing parameters
 	coupled_path = joinpath(name,"coupled")
 
-	fluxes = 2π .* Load(joinpath("data",coupled_path,"fluxes.csv"))
-	frequencies = Load(joinpath("data",coupled_path,"frequencies.csv"))
-
-	# crop to one period of data
-	mask = (-π .< fluxes) .& (fluxes.<π)
-	fluxes,frequencies = fluxes[mask],frequencies[mask]
+	fluxes = 2π .* Load(joinpath("data",coupled_path,"fluxes.csv"))[:,1]
+	frequencies = Load(joinpath("data",coupled_path,"frequencies.csv"))[:,1]
 	targets = (fluxes=fluxes,frequencies=frequencies,weights=@. exp(-abs(sin(fluxes))))
 	
 	# show data
 	plot( grid=false, size=(500,500), xlabel=L"\mathrm{External\,\,\,Phase}\,\,\,\phi", ylabel=L"\mathrm{Frequency\,\,\,GHz}")
-	scatter!( targets.fluxes, targets.frequencies, color=:darkblue, ylim=extrema(frequencies), markerstrokewidth=0, markersize=3targets.weights, label="Coupling Data")
+	scatter!( targets.fluxes, targets.frequencies, color=:darkblue, ylim=(percentile(targets.frequencies,1),percentile(targets.frequencies,99)), markerstrokewidth=0, markersize=3targets.weights, label="Coupling Data")
 	plot!( targets.fluxes, targets.frequencies, ϕ->Frequencies(fluxonium,ϕ,parameters;nlevels=nlevels), parameters)
 end
 
@@ -113,13 +110,15 @@ end
 savefig(joinpath("figures",name*".coupled.pdf"))
 
 begin # explore coupling parameter uncertainty
-	Gcrange = range(-0.6,0.6,length=50)
+	Gcrange = range(-0.8,0.8,length=50)
 	Glrange = range(-0.1,0.1,length=50)
 
 	contourf( Glrange, Gcrange, (x,y)->loss( system, merge(parameters,(Gl=x,Gc=y)), targets; nlevels=nlevels_coupled, coupled=true),
 		size=(500,500), xlabel=L"\mathrm{Inductive\quad Coupling}\quad G_L",ylabel=L"\mathrm{Capacitive\quad Coupling}\quad G_C")
-	plot!(titlefontsize=10,title=LaTeXString("\$E_L=$(round(parameters.El,digits=2))\\quad E_C=$(round(parameters.Ec,digits=2))\\quad E_J=$(round(parameters.Ej,digits=2))\\quad G_L=$(round(parameters.Gl,digits=2))\\quad G_C=$(round(parameters.Gc,digits=2))\\quad \\nu_R=$(round(parameters.νr,digits=2))\$"))
-	scatter!([parameters.Gl],[parameters.Gc],label="Optimum")
+	plot!(titlefontsize=10,title=LaTeXString("\$E_L=$(round(parameters.El,digits=2))\\quad E_C=$(round(parameters.Ec,digits=2))\\quad E_J=$(round(parameters.Ej,digits=2))\\quad \\nu_R=$(round(parameters.νr,digits=2))\$"))
+	scatter!([parameters.Gl],[parameters.Gc],label=LaTeXString("\$G_L=$(round(parameters.Gl,digits=2))\\quad G_C=$(round(parameters.Gc,digits=2))\$"))
 
 end
+
+# save final figure when happy
 savefig(joinpath("figures",name*".coupled.uncertainty.pdf"))
