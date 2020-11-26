@@ -58,7 +58,7 @@ function Coupling!( system::Hermitian, ϕ::T, parameters::NamedTuple) where T<:N
     ϕ₀ = (8Ec/El)^(1/4)
 
     Fluxonium!(fluxonium,ϕ,parameters)
-    system.data .= fluxonium ⊗ I(n)  +  νr*resonator  +  Gl*ϕ₀ * inductive_term - Gc/ϕ₀ * capacitive_term
+    system.data .= fluxonium ⊗ I(n)  +  νr*resonator  -  Gl*ϕ₀ * inductive_term + Gc/ϕ₀ * capacitive_term
     
     return nothing
 end

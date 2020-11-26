@@ -78,11 +78,11 @@ begin # fit model parameters
 	system = Hermitian(zeros(n*N,n*N))
 
 	############################ coupling terms
-	A = annihilation(N)
-	a = annihilation(n)
+	a = annihilation(n) # resonator
+	b = annihilation(N) # fluxonium
 
-	inductive_term =  (A'+A)⊗(a+a')/2
-	capacitive_term = (A'-A)⊗(a-a')/2
+	inductive_term =  (b'+b)⊗(a+a')/√2
+	capacitive_term = (b'-b)⊗(a-a')/√2
 
 	##################################### optimisation
 	parameters = merge(parameters,( Gl=-0.02,Gc=0.331,νr=5.9515 ))
