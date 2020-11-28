@@ -47,12 +47,27 @@ begin # fit model parameters
 	parameters = merge(parameters,fluxonium_parameters)
 
 	# show results
-	plot!( fluxes, frequencies, ϕ->Frequencies(fluxonium,ϕ,parameters;nlevels=nlevels), parameters)
+	plot(fluxes,frequencies,spectrum,targets)
+	plot!(fluxes,ϕ->Frequencies(fluxonium,ϕ,parameters;nlevels=nlevels),linestyle=:dot,color=:white)
+	plot!(titlefontsize=12,title=LaTeXString("\$E_L=$(round(parameters.El,digits=2))\\mathrm{GHz}\\quad E_C=$(round(parameters.Ec,digits=2))\\mathrm{GHz}\\quad E_J=$(round(parameters.Ej,digits=2))\\mathrm{GHz}\$")) |> display
 	println(result)
 end
 
 # save final figure when happy
 savefig(joinpath("figures",name*".pdf"))
+
+begin # parameter uncertainty
+	Elrange = range(0.01,1/2,length=50)
+	Ejrange = range(0.01,3,length=50)
+
+	contourf( Elrange, Ejrange, (x,y)->loss( fluxonium, merge(parameters,(El=x*parameters.Ec,Ej=y*parameters.Ec)), targets; nlevels=nlevels),
+		size=(500,500), color=:tokyo, xlabel=L"E_L/E_C",ylabel=L"E_J/E_C", title=L"\mathrm{Loss\,\,Landscape}\quad\log L(\theta)")
+	scatter!([parameters.El/parameters.Ec],[parameters.Ej/parameters.Ec],marker=:star,markersize=10,color=:white,label=LaTeXString("\$E_L=$(round(parameters.El,digits=2))\\mathrm{GHz}\\quad E_C=$(round(parameters.Ec,digits=2))\\mathrm{GHz}\\quad E_J=$(round(parameters.Ej,digits=2))\\mathrm{GHz}\$"))
+
+end
+
+# save final figure when happy
+savefig(joinpath("figures",name*".uncertainty.pdf"))
 
 ##########################################################################
 ##########################################################################
@@ -66,9 +81,9 @@ begin # load data with preprocessing parameters
 	targets = (fluxes=fluxes,frequencies=frequencies,weights=@. exp(-abs(sin(fluxes))))
 	
 	# show data
-	plot( grid=false, size=(500,500), xlabel=L"\mathrm{External\,\,\,Phase}\,\,\,\phi", ylabel=L"\mathrm{Frequency\,\,\,GHz}")
-	scatter!( targets.fluxes, targets.frequencies, color=:darkblue, ylim=(percentile(targets.frequencies,1),percentile(targets.frequencies,99)), markerstrokewidth=0, markersize=3targets.weights, label="Coupling Data")
-	plot!( targets.fluxes, targets.frequencies, ϕ->Frequencies(fluxonium,ϕ,parameters;nlevels=nlevels), parameters)
+	plot( grid=false, ylim=(percentile(targets.frequencies,1),percentile(targets.frequencies,99)), size=(500,500), xlabel=L"\mathrm{External\,\,\,Phase}\,\,\,\phi", ylabel=L"\mathrm{Frequency\,\,\,GHz}")
+	plot!( targets.fluxes, ϕ->Frequencies(fluxonium,ϕ,parameters;nlevels=nlevels), color=cgrad(:tokyo)[end-4])
+	scatter!( targets.fluxes, targets.frequencies, color=cgrad(:tokyo)[50], markerstrokewidth=0, markersize=4targets.weights, label="") |> display
 end
 
 begin # fit model parameters
@@ -102,21 +117,24 @@ begin # fit model parameters
 	parameters = merge(parameters,coupling_parameters)
 
 	# show results
-	plot!( fluxes, frequencies, ϕ->Frequencies(system,ϕ,parameters;nlevels=nlevels_coupled,coupled=true), parameters; color=:blue)
+	plot( grid=false, ylim=(percentile(targets.frequencies,1),percentile(targets.frequencies,99)), size=(500,500), xlabel=L"\mathrm{External\,\,\,Phase}\,\,\,\phi", ylabel=L"\mathrm{Frequency\,\,\,GHz}")
+	plot!( targets.fluxes, ϕ->Frequencies(fluxonium,ϕ,parameters;nlevels=nlevels), color=cgrad(:tokyo)[end-4])
+	plot!( targets.fluxes, ϕ->Frequencies(system,ϕ,parameters;nlevels=nlevels_coupled,coupled=true); color=cgrad(:tokyo)[180] )
+	scatter!( targets.fluxes, targets.frequencies, color=cgrad(:tokyo)[50], markerstrokewidth=0, markersize=4targets.weights, label="")
+	plot!(titlefontsize=9,title=LaTeXString("\$E_L=$(round(parameters.El,digits=2))\\quad E_C=$(round(parameters.Ec,digits=2))\\quad E_J=$(round(parameters.Ej,digits=2))\\quad G_L=$(round(parameters.Gl,digits=2))\\quad G_C=$(round(parameters.Gc,digits=2))\\quad \\nu_R=$(round(parameters.νr,digits=2))\$")) |> display
 	println(result)
 end
 
 # save final figure when happy
 savefig(joinpath("figures",name*".coupled.pdf"))
 
-begin # explore coupling parameter uncertainty
+begin # parameter uncertainty
 	Gcrange = range(-0.8,0.8,length=50)
 	Glrange = range(-0.1,0.1,length=50)
 
 	contourf( Glrange, Gcrange, (x,y)->loss( system, merge(parameters,(Gl=x,Gc=y)), targets; nlevels=nlevels_coupled, coupled=true),
-		size=(500,500), xlabel=L"\mathrm{Inductive\quad Coupling}\quad G_L",ylabel=L"\mathrm{Capacitive\quad Coupling}\quad G_C")
-	plot!(titlefontsize=10,title=LaTeXString("\$E_L=$(round(parameters.El,digits=2))\\quad E_C=$(round(parameters.Ec,digits=2))\\quad E_J=$(round(parameters.Ej,digits=2))\\quad \\nu_R=$(round(parameters.νr,digits=2))\$"))
-	scatter!([parameters.Gl],[parameters.Gc],label=LaTeXString("\$G_L=$(round(parameters.Gl,digits=2))\\quad G_C=$(round(parameters.Gc,digits=2))\$"))
+		size=(500,500), color=:tokyo, xlabel=L"\mathrm{Inductive\quad Coupling}\quad G_L",ylabel=L"\mathrm{Capacitive\quad Coupling}\quad G_C", title=L"\mathrm{Loss\,\,Landscape}\quad\log L(\theta)")
+	scatter!([parameters.Gl],[parameters.Gc],marker=:star,markersize=10,color=:white,label=LaTeXString("\$G_L=$(round(parameters.Gl,digits=2))\\quad G_C=$(round(parameters.Gc,digits=2))\$")) |> display
 
 end
 

@@ -88,21 +88,20 @@ repeated_erode(img::AbstractArray, n::Integer; region=[1,2]) = reduce(∘, ntupl
 import Plots: plot, plot!
 function plot(fluxes::Vector,frequencies::Vector,spectrum::Array,targets::NamedTuple)
     plot( grid=false, size=(500,500), xlabel=L"\mathrm{External\,\,\,Phase}\,\,\,\phi", ylabel=L"\mathrm{Frequency\,\,\,GHz}",legend=:none)
-    heatmap!(fluxes,frequencies,Float64.(spectrum),color=:inferno)
+    heatmap!(fluxes,frequencies,Float64.(spectrum),color=:tokyo)
 
     scatter!(targets.fluxes, targets.frequencies, label="", alpha=0.5,
         color=:white, markerstrokewidth=0, markersize=7 .*targets.weights) |> display
 end
 
-function plot!(fluxes::Vector,frequencies::Vector,model::Function,parameters::NamedTuple; color=:gold)
+function plot!(fluxes::Vector,model::Function; label="", color=:gold, linewidth=3, linestyle=:solid)
 
     model_fluxes = minimum(fluxes):0.01:maximum(fluxes)
     model_frequencies = map(model,model_fluxes)
 
     for idx ∈ 1:length(first(model_frequencies))
         plot!( model_fluxes, map( ϕ->ϕ[idx], model_frequencies),
-            label="", color=color, linewidth=3 )
+            label=label, color=color, linewidth=linewidth, linestyle=linestyle )
     end
-
-    plot!(titlefontsize=9,title=LaTeXString("\$E_L=$(round(parameters.El,digits=2))\\quad E_C=$(round(parameters.Ec,digits=2))\\quad E_J=$(round(parameters.Ej,digits=2))\\quad G_L=$(round(parameters.Gl,digits=2))\\quad G_C=$(round(parameters.Gc,digits=2))\\quad \\nu_R=$(round(parameters.νr,digits=2))\$")) |> display
+    plot!() |> display
 end
