@@ -13,7 +13,7 @@ end
 ################################################################ uncoupled
 
 begin # load data with preprocessing parameters
-	name = "B/L4"
+	name = "B/L3"
 	data_path = joinpath("data",name)
 
 	fluxes,frequencies,spectrum,targets = File(data_path;
@@ -88,7 +88,7 @@ end
 
 begin # fit model parameters
 
-	n = 2 # initialise resonator coupling hamiltonian
+	n = 5 # initialise resonator coupling hamiltonian
 	resonator = I(N) ⊗ Resonator(n)
 	system = Hermitian(zeros(n*N,n*N))
 
@@ -96,8 +96,8 @@ begin # fit model parameters
 	a = annihilation(n) # resonator
 	b = annihilation(N) # fluxonium
 
-	inductive_term =  (b'+b)⊗(a+a')/√2
-	capacitive_term = (b'-b)⊗(a-a')/√2
+	inductive_term =  (b+b')⊗(a+a')/√2
+	capacitive_term = (b-b')⊗(a-a')/√2
 
 	##################################### optimisation
 	parameters = merge(parameters,( Gl=-0.02,Gc=0.331,νr=5.9515 ))
@@ -130,7 +130,7 @@ savefig(joinpath("figures",name*".coupled.pdf"))
 
 begin # parameter uncertainty
 	Gcrange = range(-0.8,0.8,length=50)
-	Glrange = range(-0.1,0.1,length=50)
+	Glrange = range(-0.2,0.2,length=50)
 
 	contourf( Glrange, Gcrange, (x,y)->loss( system, merge(parameters,(Gl=x,Gc=y)), targets; nlevels=nlevels_coupled, coupled=true),
 		size=(500,500), color=:tokyo, xlabel=L"\mathrm{Inductive\quad Coupling}\quad G_L",ylabel=L"\mathrm{Capacitive\quad Coupling}\quad G_C", title=L"\mathrm{Loss\,\,Landscape}\quad\log L(\theta)")
