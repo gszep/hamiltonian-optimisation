@@ -13,16 +13,16 @@ end
 ################################################################ uncoupled
 
 begin # load data with preprocessing parameters
-	name = "B/L3"
-	data_path = joinpath("data",name)
+	name = "B/L4"
+	data_path = joinpath("data",name,"uncoupled")
 
-	fluxes,frequencies,spectrum,targets = File(data_path;
-
-		# preprocessing parameters can be updated here
-		# threshold = 0.047, downSample=10, dilations=3, erosions=1,
-		# frequencyLimits=(-Inf,9.5)
-	)
-	plot(fluxes,frequencies,spectrum,targets)
+	fluxes = Load(joinpath(data_path,"fluxes.csv"))[:,1]
+	frequencies = Load(joinpath(data_path,"frequencies.csv"))[:,1]
+	targets = (fluxes=fluxes,frequencies=frequencies,weights=@. exp(-abs(sin(fluxes))))
+	
+	# show data
+	plot( grid=false, ylim=(percentile(targets.frequencies,1),percentile(targets.frequencies,99)), size=(500,500), xlabel=L"\mathrm{External\,\,\,Phase}\,\,\,\phi", ylabel=L"\mathrm{Frequency\,\,\,GHz}")
+	scatter!( targets.fluxes, targets.frequencies, color=cgrad(:tokyo)[50], markerstrokewidth=0, markersize=4targets.weights, label="") |> display
 end
 
 begin # fit model parameters
