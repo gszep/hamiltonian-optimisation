@@ -1,3 +1,10 @@
 .*
 !.gitignore
 Manifest.toml
+data/C/L4/Targets.nb
+data/C/L2/Targets.nb
+data/C/L4/0photons.mat
+data/C/L2/0photons.mat
+data/B/L4/0photons.mat
+data/B/L3/0photons.mat
+data/C/L2/specData.csv
