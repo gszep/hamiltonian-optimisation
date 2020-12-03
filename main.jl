@@ -13,14 +13,14 @@ end
 ################################################################ uncoupled
 
 begin # load data with preprocessing parameters
-	name = "B/L3"
+	name = "Flux3D"
 	data_path = joinpath("data",name)
 
 	fluxes,frequencies,spectrum,targets = File(data_path;
 
 		# preprocessing parameters can be updated here
-		# threshold = 0.047, downSample=10, dilations=3, erosions=1,
-		# frequencyLimits=(-Inf,9.5)
+		#threshold =4.5, downSample=1, dilations=2, erosions=1,
+		#frequencyLimits=(-Inf,6.5),maxTargets = 5000
 	)
 	plot(fluxes,frequencies,spectrum,targets)
 end
@@ -30,7 +30,8 @@ begin # fit model parameters
 	N = 20 # initialise fluxonium hamiltonian
 	fluxonium = Hermitian(zeros(N,N))
 
-	parameters = ( El=1.0,Ec=1.0,Ej=1.0, Gl=0.0,Gc=0.0,νr=NaN )
+	# parameters = ( El=10.7,Ec=0.540,Ej=9.0, Gl=0.0,Gc=0.0,νr=NaN )
+	parameters = ( El=0.72,Ec=0.510,Ej=3.0, Gl=0.0,Gc=0.0,νr=NaN )
 	nlevels = 1:1
 	
 	##################################### optimisation
@@ -47,7 +48,9 @@ begin # fit model parameters
 	parameters = merge(parameters,fluxonium_parameters)
 
 	# show results
+	
 	plot( grid=false, ylim=(percentile(targets.frequencies,1),percentile(targets.frequencies,99)), size=(500,500), xlabel=L"\mathrm{External\,\,\,Phase}\,\,\,\phi", ylabel=L"\mathrm{Frequency\,\,\,GHz}")
+	heatmap!(fluxes,frequencies,spectrum)
 	plot!( targets.fluxes, ϕ->Frequencies(fluxonium,ϕ,parameters;nlevels=nlevels), color=:gold)
 	scatter!( targets.fluxes, targets.frequencies, color=cgrad(:tokyo)[50], markerstrokewidth=0, markersize=4targets.weights, label="")
 	plot!(titlefontsize=9,title=LaTeXString("\$E_L=$(round(parameters.El,digits=3))\\quad E_C=$(round(parameters.Ec,digits=3))\\quad E_J=$(round(parameters.Ej,digits=3))\$")) |> display
