@@ -8,7 +8,7 @@ function Load(source; kwargs...)
     if isfile(source)
 
         data = CSV.File(source; header=false, kwargs...) |> DataFrame
-        return convert(Array,data)
+        return Array(data)
 
     else 
         throw("no such file $source")
